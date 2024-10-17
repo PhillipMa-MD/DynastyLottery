@@ -92,6 +92,20 @@ with col2:
     })
     st.bar_chart(chart_data.set_index('Team'))
 
+st.subheader("Lottery Ball Distribution (100 balls total)")
+ball_distribution = [round(odd * 100) for odd in odds]
+
+# Adjust to ensure total is 100
+while sum(ball_distribution) != 100:
+    if sum(ball_distribution) > 100:
+        ball_distribution[np.argmax(ball_distribution)] -= 1
+    else:
+        ball_distribution[np.argmin(ball_distribution)] += 1
+
+for i, balls in enumerate(ball_distribution):
+    team_name = lottery_teams.iloc[i]['Team']
+    st.write(f"Team {i+1} ({team_name}): {balls} balls")
+
 # Simulate lottery
 if st.button("Run Simulation"):
     simulations = simulate_lottery(data, odds)
