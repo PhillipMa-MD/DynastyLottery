@@ -1,6 +1,7 @@
-# DynastyLottery
-
+# Dynasty Lottery Simulator
 ## Simulator for Dynasty League Lottery System
+
+![App Preview](etc/Screenshot.png)
 
 This is a Streamlit app I wrote to simulate different weighting schemes for a dynasty fantasy football league that I am the commissioner for. 
 
