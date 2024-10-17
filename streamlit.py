@@ -1,91 +1,75 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
-import random
+import matplotlib.pyplot as plt
+# Function to load CSV file
+@st.cache_data
+def load_data(file_path='Dynasty2024.csv'):
+    data = pd.read_csv(file_path)
+    return data
 
-# Function to simulate the draft lottery
-def simulate_lottery(teams, ticket_weights, num_simulations=10):
+# Function to simulate lottery
+def simulate_lottery(data, odds, num_simulations=10):
+    lottery_teams = data[data['Playoff_Rank'] > 6].sort_values('MaxPF')
+    num_lottery_teams = len(lottery_teams)
+    
     results = []
     for _ in range(num_simulations):
-        hat = []
-        for team, weight in zip(teams, ticket_weights):
-            hat.extend([team] * weight)
-        random.shuffle(hat)
-        draft_order = []
-        for _ in range(len(teams)):
-            pick = random.choice(hat)
-            draft_order.append(pick)
-            hat = [ticket for ticket in hat if ticket != pick]
+        lottery_order = np.random.choice(range(num_lottery_teams), size=num_lottery_teams, replace=False, p=odds)
+        draft_order = [lottery_teams.index[i] for i in lottery_order]
+        draft_order += list(data[data['Playoff_Rank'] <= 6].sort_values('Playoff_Rank', ascending=False).index)
         results.append(draft_order)
+    
     return results
 
 # Streamlit app
+st.title('Dynasty Fantasy Football Draft Lottery Simulator')
 
+# Load data
+data = load_data()
 
-st.set_page_config(layout="wide")  # Set the layout to wide mode
+# Display input data
+st.subheader("Input Data")
+st.dataframe(data)
 
-st.title("Dynasty Football League Lottery Draft Simulator")
+# Get non-playoff teams sorted by MaxPF
+lottery_teams = data[data['Playoff_Rank'] > 6].sort_values('MaxPF')
+num_lottery_teams = len(lottery_teams)
 
-st.sidebar.header("Upload CSV")
-df = pd.read_csv('Dynasty2024.csv')
+# Adjust lottery odds
+st.subheader("Adjust Lottery Odds")
+st.write("Adjust the odds for each non-playoff team. Team 1 has the lowest MaxPF, Team 6 has the highest.")
 
-if df is not None:
+odds = []
+for i in range(num_lottery_teams):
+    default_odds = (num_lottery_teams - i) / sum(range(1, num_lottery_teams + 1))
+    odds.append(st.slider(f"Team {i+1} (Relative MaxPF Rank: {i+1})", 0.0, 1.0, default_odds, 0.01))
 
-    df = df.sort_values(by='MaxPF', ascending=True).reset_index(drop=True)
+# Normalize odds
+odds = [o / sum(odds) for o in odds]
+
+# Display normalized odds
+st.subheader("Normalized Odds")
+for i, odd in enumerate(odds):
+    st.write(f"Team {i+1}: {odd:.2%}")
+
+# Simulate lottery
+if st.button("Run Simulation"):
+    simulations = simulate_lottery(data, odds)
     
-    # Generate default draft positions based on MaxPF
-    df['Default Draft Position'] = df.index + 1
-    
-    st.write('### Standings and Max Points For (Sorted by Worst to Best)')
-    
-    teams = df['Team'].tolist()
-    st.write("### Enter the number of tickets for each team")
-    ticket_weights = []
-    for team in teams:
-        weight = st.sidebar.number_input(f"{team}", min_value=1, max_value=100, value=1)
-        ticket_weights.append(weight)
-    
-    # Calculate probabilities and odds
-    total_tickets = sum(ticket_weights)
-    probabilities = [weight / total_tickets * 100 for weight in ticket_weights]
-    odds = [f"{round(prob / (100 - prob), 2)}:1" if prob != 100 else "1:0" for prob in probabilities]
+    st.subheader("Simulation Results")
+    for i, result in enumerate(simulations, 1):
+        st.write(f"Simulation {i}:")
+        for pick, team_index in enumerate(result, 1):
+            st.write(f"Pick {pick}: {data.loc[team_index, 'Team']} (MaxPF: {data.loc[team_index, 'MaxPF']})")
+        st.write("---")
 
-    ticket_info_df = pd.DataFrame({
-        'Team': teams,
-        'Tickets': ticket_weights,
-        'Probability (%)': [f"{prob:.2f}%" for prob in probabilities],
-        'Odds': odds
-    })
-    
-    # Display original standings and ticket info side by side
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("### Sorted Standings")
-        st.table(df[['Team', 'MaxPF', 'Default Draft Position']].style.hide(axis="index"))
-    with col2:
-        st.write("### Team Tickets and Lottery Odds")
-        st.table(ticket_info_df.style.hide(axis="index"))
+# Display odds distribution
+st.subheader("Odds Distribution")
+fig, ax = plt.subplots()
+ax.bar(range(1, num_lottery_teams + 1), odds)
+ax.set_xlabel("Team (Relative MaxPF Rank)")
+ax.set_ylabel("Probability")
+ax.set_title("Lottery Odds Distribution")
+st.pyplot(fig)
 
-    if st.sidebar.button("Simulate Lottery"):
-        num_simulations = st.sidebar.number_input("Number of simulations", min_value=1, value=10)
-        results = simulate_lottery(teams, ticket_weights, num_simulations)
-        
-        st.write("### Simulated Lottery Results")
-        
-        # Create and display dataframes side by side for each simulation
-        result_dfs = []
-        for i, result in enumerate(results):
-            sim_df = pd.DataFrame({
-                'Pick': list(range(1, len(result) + 1)),
-                'Team': result
-            })
-            result_dfs.append(sim_df)
-
-        chunked_dfs = [result_dfs[i:i+5] for i in range(0, len(result_dfs), 5)]  # Chunk the dataframes to fit into rows
-        
-        for chunk in chunked_dfs:
-            columns = st.columns(len(chunk))
-            for col, result_df in zip(columns, chunk):
-                with col:
-                    st.table(result_df.style.hide(axis="index"))
