@@ -10,14 +10,14 @@ def load_data(file_path='Dynasty2024.csv'):
 
 # Function to simulate lottery
 def simulate_lottery(data, odds, num_simulations=10):
-    lottery_teams = data[data['Playoff_Rank'] > 6].sort_values('MaxPF')
+    lottery_teams = data[data['Playoff_Rank'] > (12 - len(odds))].sort_values('MaxPF')
     num_lottery_teams = len(lottery_teams)
     
     results = []
     for _ in range(num_simulations):
         lottery_order = np.random.choice(range(num_lottery_teams), size=num_lottery_teams, replace=False, p=odds)
         draft_order = [lottery_teams.index[i] for i in lottery_order]
-        draft_order += list(data[data['Playoff_Rank'] <= 6].sort_values('Playoff_Rank', ascending=False).index)
+        draft_order += list(data[data['Playoff_Rank'] <= (12 - len(odds))].sort_values('Playoff_Rank', ascending=False).index)
         results.append(draft_order)
     
     return results
@@ -37,9 +37,11 @@ data = load_data()
 st.subheader("Input Data")
 st.dataframe(data)
 
-# Get non-playoff teams sorted by MaxPF
-lottery_teams = data[data['Playoff_Rank'] > 6].sort_values('MaxPF')
-num_lottery_teams = len(lottery_teams)
+# Select number of lottery teams
+num_lottery_teams = st.radio("Number of teams in lottery", (6, 8))
+
+# Get lottery teams sorted by MaxPF
+lottery_teams = data[data['Playoff_Rank'] > (12 - num_lottery_teams)].sort_values('MaxPF')
 
 # Adjust lottery odds
 st.subheader("Adjust Lottery Odds")
@@ -50,15 +52,15 @@ exp_base = st.slider("Adjust initial odds distribution (higher value = steeper c
 # Calculate initial exponential odds
 initial_odds = calculate_exp_odds(exp_base, num_lottery_teams)
 
-# Consolation bracket winner boost
-include_boost = st.radio("Include consolation bracket winner boost?", ('Yes', 'No'))
-boost_amount = 0.05  # 5% boost
-
-st.write("Adjust the odds for each non-playoff team. Team 1 has the lowest MaxPF, Team 6 has the highest.")
+st.write(f"Adjust the odds for each non-playoff team. Team 1 has the lowest MaxPF, Team {num_lottery_teams} has the highest.")
 
 odds = []
 for i in range(num_lottery_teams):
     odds.append(st.slider(f"Team {i+1} (Relative MaxPF Rank: {i+1})", 0.0, 1.0, initial_odds[i], 0.01))
+
+# Consolation bracket winner boost
+include_boost = st.radio("Include consolation bracket winner boost?", ('Yes', 'No'))
+boost_amount = st.slider("Consolation winner odds boost", 0.0, 0.2, 0.05, 0.01)
 
 # Apply consolation bracket winner boost if selected
 if include_boost == 'Yes':
@@ -109,5 +111,6 @@ if st.button("Run Simulation"):
             for pick, team_index in enumerate(result, 1):
                 st.write(f"Pick {pick}: {data.loc[team_index, 'Team']} (MaxPF: {data.loc[team_index, 'MaxPF']})")
             st.write("---")
+
 
 
