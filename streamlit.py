@@ -47,7 +47,7 @@ lottery_teams = data[data['Playoff_Rank'] > (12 - num_lottery_teams)].sort_value
 st.subheader("Adjust Lottery Odds")
 
 # Add slider for exp_base
-exp_base = st.slider("Adjust initial odds distribution (higher value = steeper curve)", 1.1, 2.0, 1.5, 0.1)
+exp_base = st.slider("Adjust initial odds distribution (higher value = steeper curve)", 1.1, 3.0, 1.5, 0.1)
 
 # Calculate initial exponential odds
 initial_odds = calculate_exp_odds(exp_base, num_lottery_teams)
@@ -83,7 +83,7 @@ with col1:
         if include_boost == 'Yes' and i == consolation_winner_position:
             st.write("(Includes consolation winner boost)")
 
-# Display odds distribution using Streamlit's native chart in the second column
+# Display odds distribution
 with col2:
     st.subheader("Odds Distribution")
     chart_data = pd.DataFrame({
@@ -92,12 +92,12 @@ with col2:
     })
     st.bar_chart(chart_data.set_index('Team'))
 
-st.subheader("Lottery Ball Distribution (100 balls total)")
-ball_distribution = [round(odd * 100) for odd in odds]
+st.subheader("Lottery Ball Distribution (200 balls total)")
+ball_distribution = [round(odd * 200) for odd in odds]
 
 # Adjust to ensure total is 100
-while sum(ball_distribution) != 100:
-    if sum(ball_distribution) > 100:
+while sum(ball_distribution) != 200:
+    if sum(ball_distribution) > 200:
         ball_distribution[np.argmax(ball_distribution)] -= 1
     else:
         ball_distribution[np.argmin(ball_distribution)] += 1
