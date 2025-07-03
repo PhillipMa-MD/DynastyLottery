@@ -247,7 +247,7 @@ else:
 
         final_order = st.session_state.draft_order.copy()
         valid_playoff_teams = [pt for pt in st.session_state.playoff_teams if pt['name'].strip()]
-        sorted_playoff_teams = sorted(valid_playoff_teams, key=lambda x: x['rank'])
+        sorted_playoff_teams = sorted(valid_playoff_teams, key=lambda x: x['rank'], reverse=True)
         for i, team_info in enumerate(sorted_playoff_teams):
             final_order.append({"pick": LOTTERY_TEAMS_COUNT + i + 1, "team": team_info['name']})
         
