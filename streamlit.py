@@ -468,9 +468,18 @@ def calculate_initial_distribution():
             total_assigned += int(num_balls)
         if total_assigned != TOTAL_BALLS:
             distribution[sorted_teams[0]['name']] += TOTAL_BALLS - total_assigned
+        winner = st.session_state.get('consolation_winner')
+        if winner and winner in distribution:
+            donor = max(distribution, key=lambda t: distribution[t])          # most balls
+            if donor == winner:
+                donor = sorted(distribution, key=lambda t: distribution[t], reverse=True)[1]  # 2nd most
+            distribution[donor] -= 1
+            distribution[winner] += 1
+            st.session_state.consolation_applied = True
+        else:
+            st.session_state.consolation_applied = False
         st.session_state.ball_distribution = distribution
         st.session_state.app_started = True
-        st.session_state.consolation_applied = False
         st.session_state.error_message = ""
         assign_ball_numbers(distribution)
     except Exception as e:
@@ -488,22 +497,6 @@ def assign_ball_numbers(distribution):
                 owner_map[ball_numbers[idx]] = team
                 idx += 1
     st.session_state.ball_owner_map = owner_map
-
-
-def apply_consolation_prize(consolation_winner):
-    if not st.session_state.ball_distribution:
-        st.session_state.error_message = "Calculate initial distribution first."
-        return
-    valid_teams = [t for t in st.session_state.lottery_teams if t['name'].strip()]
-    worst = sorted(valid_teams, key=lambda x: x['max_pf'])[0]['name']
-    if worst == consolation_winner:
-        st.session_state.error_message = "The team with the worst MaxPF cannot win the consolation prize."
-        return
-    st.session_state.ball_distribution[worst] -= 1
-    st.session_state.ball_distribution[consolation_winner] += 1
-    st.session_state.consolation_applied = True
-    st.session_state.error_message = ""
-    assign_ball_numbers(st.session_state.ball_distribution)
 
 
 def draw_lottery_ball(drawn_ball_number):
@@ -564,6 +557,7 @@ if 'app_started' not in st.session_state:
     st.session_state.ball_owner_map = {}
     st.session_state.draft_order = []
     st.session_state.consolation_applied = False
+    st.session_state.consolation_winner = None
     st.session_state.error_message = ""
     st.session_state.last_winner = None
     st.session_state.last_drawn_ball = None
@@ -636,6 +630,20 @@ with st.sidebar:
                 label_visibility="collapsed",
             )
 
+        # Use the RAW name (only filter empties by .strip()) so option strings match the
+        # distribution keys exactly — distribution keys are built from raw team['name'].
+        lottery_names = [t['name'] for t in st.session_state.lottery_teams if t['name'].strip()]
+        options = ["(None)"] + lottery_names
+        prev = st.session_state.get('consolation_winner')
+        default_index = options.index(prev) if prev in options else 0
+        choice = st.radio(
+            "🏅 Consolation Bracket Winner (+1 ball)",
+            options,
+            index=default_index,
+            help="Applied when you click Calculate Initial Distribution.",
+        )
+        st.session_state.consolation_winner = None if choice == "(None)" else choice
+
     with st.expander("**Playoff Teams**"):
         hc1, hc2 = st.columns([2, 1])
         hc1.markdown("<small style='color:#7a8fa8;'>Name</small>", unsafe_allow_html=True)
@@ -694,6 +702,8 @@ else:
     m1, m2 = st.columns(2)
     m1.metric("Next Pick", f"#{next_pick}" if picks_done < LOTTERY_TEAMS_COUNT else "Done")
     m2.metric("Teams Remaining", teams_left)
+    if st.session_state.consolation_applied:
+        st.caption(f"🏅 Consolation: {st.session_state.consolation_winner} received +1 ball")
     st.markdown("<div style='margin-bottom:1.1rem;'></div>", unsafe_allow_html=True)
 
     # ── Per-pick winner celebration ───────────────────────────────────────────
@@ -713,22 +723,6 @@ else:
             last_w,
         )
         st.session_state.last_celebrated = last_w
-
-    # ── Consolation prize ─────────────────────────────────────────────────────
-    if not st.session_state.consolation_applied and picks_done == 0:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Consolation Prize (Optional)")
-        lottery_names = [t['name'] for t in st.session_state.lottery_teams if t['name']]
-        consolation_choice = st.selectbox(
-            "Select consolation bracket winner — receives 1 extra ball:",
-            options=lottery_names,
-            index=None,
-            placeholder="Choose a team...",
-        )
-        if consolation_choice and st.button("Apply Consolation Prize", type="primary"):
-            apply_consolation_prize(consolation_choice)
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Drawing phase ─────────────────────────────────────────────────────────
     if picks_done < LOTTERY_TEAMS_COUNT:
