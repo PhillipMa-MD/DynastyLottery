@@ -19,6 +19,20 @@ INITIAL_PROBS = [71.98, 16.17, 8.00, 2.67, 0.89, 0.30]
 STANDINGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Standings")
 CHIP_COLORS = ["#FFB627", "#4ECDC4", "#45B7D1", "#96CEB4", "#F7B2BD", "#C5A8FF"]
 
+
+def american_odds(pct):
+    """Win probability (percent, 0-100) -> American moneyline string, e.g. '-257' / '+519'."""
+    p = pct / 100
+    if p <= 0:
+        return "N/A"
+    if p >= 1:
+        return "—"           # em dash: guaranteed, no meaningful line
+    if p > 0.5:
+        val = -100 * p / (1 - p)  # favorite -> negative
+    else:
+        val = 100 * (1 - p) / p   # underdog -> positive
+    return f"{val:+.0f}"
+
 # ── Custom CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -138,19 +152,20 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .ball-pool {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.45rem;
-    margin: 0.6rem 0 1rem;
+    gap: 0.7rem;
+    margin: 0.8rem 0 1rem;
 }
 .team-chip {
-    border-radius: 8px;
-    padding: 0.5rem 0.7rem;
-    min-width: 96px;
-    flex: 1 1 96px;
-    max-width: 180px;
+    border-radius: 12px;
+    padding: 0.9rem 1.1rem;
+    min-width: 140px;
+    flex: 1 1 140px;
+    max-width: 240px;
 }
-.chip-team  { font-weight: 700; font-size: 0.8rem;  color: #0d1426; display: block; }
-.chip-pct   { font-size: 1.05rem; font-weight: 700; color: #0d1426; display: block; }
-.chip-balls { font-size: 0.7rem;  color: rgba(13,20,38,0.72); display: block; }
+.chip-team  { font-weight: 700; font-size: 1rem;   color: #0d1426; display: block; }
+.chip-pct   { font-size: 1.7rem; font-weight: 800; color: #0d1426; display: block; margin-top: 0.15rem; }
+.chip-odds  { font-size: 0.95rem; font-weight: 700; color: rgba(13,20,38,0.85); display: block; }
+.chip-balls { font-size: 0.75rem; color: rgba(13,20,38,0.72); display: block; margin-top: 0.1rem; }
 
 /* ── Final banner ── */
 .final-banner {
@@ -758,25 +773,24 @@ else:
                 st.markdown(f"**Current Odds — Pick #{next_pick}**")
 
                 current_total = sum(st.session_state.ball_distribution.values())
+                sorted_dist = sorted(
+                    st.session_state.ball_distribution.items(),
+                    key=lambda kv: kv[1], reverse=True,
+                )
                 chips_html = '<div class="ball-pool">'
-                for idx, (team, count) in enumerate(st.session_state.ball_distribution.items()):
+                for idx, (team, count) in enumerate(sorted_dist):
                     pct = count / current_total * 100
                     color = CHIP_COLORS[idx % len(CHIP_COLORS)]
                     chips_html += (
                         f'<div class="team-chip" style="background:{color};">'
                         f'<span class="chip-team">{team}</span>'
                         f'<span class="chip-pct">{pct:.1f}%</span>'
+                        f'<span class="chip-odds">{american_odds(pct)}</span>'
                         f'<span class="chip-balls">{count} balls</span>'
                         f'</div>'
                     )
                 chips_html += '</div>'
                 st.markdown(chips_html, unsafe_allow_html=True)
-
-                odds_data = [
-                    {"Team": t, "Balls": c, f"P(Pick #{next_pick})": f"{c/current_total*100:.2f}%"}
-                    for t, c in st.session_state.ball_distribution.items()
-                ]
-                st.dataframe(pd.DataFrame(odds_data), use_container_width=True, hide_index=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
                 with st.expander("Ball Number Assignments"):
